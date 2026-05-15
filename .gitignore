@@ -1,0 +1,27 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code workspace files
+.vscode/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# OS junk
+Thumbs.db
+.DS_Store
+
+# Outputs that shouldn't bloat the repo
+# (we'll commit a few sample outputs, but not all)
+outputs/*.json
+!outputs/.gitkeep
+
+# Large model files if any get downloaded locally
+*.pth
+*.onnx

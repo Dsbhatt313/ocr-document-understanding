@@ -1,6 +1,6 @@
 # OCR Document Understanding
 
-A Python pipeline that extracts structured information from receipt and invoice images using OCR and spatial layout analysis. Built as a take-home assignment for an AI/ML/CV Intern position.
+A Python pipeline that extracts structured information from receipt and invoice images using OCR and spatial layout analysis. Built as a take-home assignment.
 
 ## What It Does
 

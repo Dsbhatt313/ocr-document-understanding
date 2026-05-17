@@ -278,5 +278,5 @@ Each improvement was measured against ground truth before and after. No accuracy
 ## Author
 
 Dhruvansh Bhatt
-- Email: dsbhatt1234@gmail.com
+- Email: dsbhatt2581@gmail.com
 - GitHub: https://github.com/Dsbhatt313

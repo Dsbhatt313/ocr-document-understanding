@@ -102,18 +102,19 @@ Personal images have lower detection rates because they include complex multi-se
 
 | Field | Correct | Partial | Wrong | Missing | Exact % | Partial % |
 |---|---|---|---|---|---|---|
-| vendor_name | 8 | 3 | 17 | 0 | 28.6 | 39.3 |
-| date | 19 | 0 | 5 | 4 | 67.9 | 67.9 |
+| vendor_name | 9 | 6 | 13 | 0 | 32.1 | 53.6 |
+| date | 19 | 1 | 5 | 3 | 67.9 | 71.4 |
 | total_amount | 9 | 4 | 9 | 6 | 32.1 | 46.4 |
-| **Overall** | **36** | **7** | **31** | **10** | **42.9** | **51.2** |
+| **Overall** | **37** | **11** | **27** | **9** | **44.0** | **57.1** |
 
 ### Accuracy progression through the project
 
-| Improvement | Overall Exact % | Change |
+| Improvement | Overall Exact % | Overall Partial % |
 |---|---|---|
-| Tesseract only (baseline) | 22.6 | — |
-| + Cross-engine agreement | 28.6 | +6.0 |
-| + Date format coverage | 42.9 | +14.3 |
+| Tesseract only | 22.6 | 29.8 |
+| + Cross-engine | 28.6 | 38.1 |
+| + Date format fixes | 42.9 | 51.2 |
+| + Fuzzy vendor + flexible dates | 44.0 | 57.1 |
 
 Each improvement was measured against ground truth. No accuracy claims without evaluation data.
 
@@ -160,11 +161,7 @@ Each improvement was measured against ground truth. No accuracy claims without e
 
 **Hough-based deskew:** the minAreaRect approach failed, but Hough line transform (detecting straight lines formed by text baselines and measuring their angles) would likely work. This would help the 14 personal phone photos that currently suffer from tilt-related OCR degradation.
 
-**Fuzzy vendor name matching:** currently vendor names must match exactly after lowercasing. Adding edit-distance or token-overlap matching (e.g., "Guardian Health And Beauty Sdn Phd" would partially match "GUARDIAN HEALTH AND BEAUTY SDN BHD" on a token basis despite "Phd" vs "BHD") would significantly improve the vendor accuracy metric.
-
 **Line-item extraction:** the items region is detected but individual product lines are not parsed into structured data (description, quantity, unit price, amount). This would require column detection within the items region and alignment of text across columns.
-
-**More date formats:** single-digit day/month ("6/2/2017"), month-as-text ("01-NOV-2017", "March 14, 2018"), and YYYYMMDD with validation (rejecting 8-digit numbers that aren't valid dates) would recover most of the remaining missing dates.
 
 **Word-pair post-correction:** using co-occurrence statistics to fix OCR errors. "Company Rea" would be corrected to "Company Reg" because "Company Reg" is a high-frequency bigram on receipts while "Company Rea" is not.
 

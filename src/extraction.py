@@ -218,8 +218,12 @@ def extract_fields(regions):
         r'\d{2}-\d{2}-\d{4}',           # DD-MM-YYYY
         r'\d{4}-\d{2}-\d{2}',           # YYYY-MM-DD
         r'\d{2}\.\d{2}\.\d{4}',         # DD.MM.YYYY
+        r'\d{1,2}/\d{1,2}/\d{4}',       # D/M/YYYY (flexible digits)
+        r'\d{1,2}-\d{1,2}-\d{4}',       # D-M-YYYY (flexible digits)
         r'\d{2}/\d{2}/\d{2}',           # DD/MM/YY
         r'\d{2}-\d{2}-\d{2}',           # DD-MM-YY
+        r'\d{1,2}/\d{1,2}/\d{2}',       # D/M/YY (flexible digits)
+        r'\d{1,2}-\d{1,2}-\d{2}',       # D-M-YY (flexible digits)
         r'\d{2}-[A-Z]{3}-\d{4}',        # DD-MMM-YYYY (01-NOV-2017)
         r'\d{2}\.\d{2}\.\d{2}',         # DD.MM.YY
     ]

@@ -166,26 +166,27 @@ Evaluated on 28 SROIE receipt images with verified ground truth.
 
 | Field | Correct | Partial | Wrong | Missing | Exact % | Partial % |
 |---|---|---|---|---|---|---|
-| vendor_name | 8 | 3 | 17 | 0 | 28.6 | 39.3 |
-| date | 19 | 0 | 5 | 4 | 67.9 | 67.9 |
+| vendor_name | 9 | 6 | 13 | 0 | 32.1 | 53.6 |
+| date | 19 | 1 | 5 | 3 | 67.9 | 71.4 |
 | total_amount | 9 | 4 | 9 | 6 | 32.1 | 46.4 |
-| **Overall** | **36** | **7** | **31** | **10** | **42.9** | **51.2** |
+| **Overall** | **37** | **11** | **27** | **9** | **44.0** | **57.1** |
 
 ### Accuracy Progression
 
-| Improvement | Overall Exact % | Change |
+| Improvement | Overall Exact % | Overall Partial % |
 |---|---|---|
-| Tesseract only (baseline) | 22.6 | — |
-| + Cross-engine agreement | 28.6 | +6.0 |
-| + Date format coverage | 42.9 | +14.3 |
+| Tesseract only | 22.6 | 29.8 |
+| + Cross-engine | 28.6 | 38.1 |
+| + Date format fixes | 42.9 | 51.2 |
+| + Fuzzy vendor + flexible dates | 44.0 | 57.1 |
 
 Each improvement was measured against ground truth before and after. No accuracy claims without evaluation data.
 
 ### Failure Analysis
 
-**Vendor name (17 wrong):** primarily OCR character errors — missing spaces in PaddleOCR output ("MRD.I.VMSDNBHD"), character confusion in Tesseract ("Phd" for "Bhd", "Heauty" for "Beauty"), or wrong line selected as vendor name.
+**Vendor name (13 wrong):** primarily OCR character errors — missing spaces in PaddleOCR output ("MRD.I.VMSDNBHD"), character confusion in Tesseract ("Phd" for "Bhd", "Heauty" for "Beauty"), or wrong line selected as vendor name.
 
-**Date (5 wrong, 4 missing):** wrong dates caused by OCR digit errors (e.g., "25/05/2016" extracted when actual is "25/05/2018" — the "18" was read as "16"). Missing dates from OCR mangling digits beyond regex recognition or non-standard formats (single-digit day/month, month-as-text like "01-NOV-2017").
+**Date (5 wrong, 3 missing):** wrong dates caused by OCR digit errors (e.g., "25/05/2016" extracted when actual is "25/05/2018" — the "18" was read as "16"). Missing dates from OCR mangling digits beyond regex recognition or non-standard formats (month-as-text like "01-NOV-2017").
 
 **Total amount (9 wrong, 6 missing):** wrong totals usually from OCR reading the wrong line (subtotal instead of total, or a price from the items section). Missing totals from OCR failing to detect the total line entirely or the keyword "TOTAL" being too garbled to match.
 

@@ -36,6 +36,33 @@ def normalize_date(value):
     return value
 
 
+def normalize_vendor(predicted, actual):
+    """
+    Token-overlap matching for vendor names.
+    Splits both into words and checks how many words overlap.
+    
+    Returns:
+        'correct' if >80% of actual tokens found in predicted
+        'partial' if >50% of actual tokens found in predicted
+        'wrong' otherwise
+    """
+    pred_tokens = set(normalize(predicted).split())
+    actual_tokens = set(normalize(actual).split())
+    
+    if not actual_tokens or not pred_tokens:
+        return None  # let normal comparison handle it
+    
+    # How many actual tokens appear in predicted?
+    overlap = actual_tokens & pred_tokens
+    overlap_ratio = len(overlap) / len(actual_tokens)
+    
+    if overlap_ratio >= 0.8:
+        return "correct"
+    elif overlap_ratio >= 0.5:
+        return "partial"
+    return None  # fall through to normal comparison
+
+
 def compare_field(predicted, actual, field_name=""):
     """
     Compare predicted vs actual field value.
@@ -63,6 +90,12 @@ def compare_field(predicted, actual, field_name=""):
     if pred in actual_norm or actual_norm in pred:
         return "partial"
     
+    # Vendor-specific: token overlap matching
+    if field_name == "vendor_name":
+        vendor_result = normalize_vendor(predicted, actual)
+        if vendor_result:
+            return vendor_result
+
     return "wrong"
 
 

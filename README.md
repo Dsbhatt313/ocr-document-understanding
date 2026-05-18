@@ -8,6 +8,7 @@ Takes a document image (receipt, invoice, tax invoice) as input and outputs stru
 
     {
       "vendor_name": "Guardian Health And Beauty Sdn Bhd",
+      "invoice_number": "14072",
       "total_amount": "38.37",
       "subtotal": "38.37",
       "date": "19/05/18",
@@ -18,11 +19,19 @@ Takes a document image (receipt, invoice, tax invoice) as input and outputs stru
         "vendor_name": "high",
         "total_amount": "high",
         "date": "medium"
+      },
+      "image_quality": {
+        "blur": "low",
+        "brightness": "acceptable",
+        "contrast": "good",
+        "resolution": "medium",
+        "overall_quality": "medium"
       }
     }
 
 **Extracted fields:**
 - vendor_name — business or company name from the receipt header
+- invoice_number — invoice or receipt number (found on 17/42 images)
 - total_amount — final payable amount
 - subtotal — pre-tax/pre-discount amount
 - date — transaction date in whatever format appears on the receipt
@@ -30,6 +39,7 @@ Takes a document image (receipt, invoice, tax invoice) as input and outputs stru
 - currency — MYR, INR, USD, SGD (detected from text cues)
 - document_type — receipt, invoice, or tax_invoice
 - confidence_notes — per-field reliability assessment (high / medium / low / very_low)
+- image_quality — automatic quality assessment (blur, brightness, contrast, resolution, overall)
 
 ## Pipeline Architecture
 
@@ -37,15 +47,15 @@ The system follows a 6-stage pipeline:
 
 **Stage 1 — Image Input:** accepts JPG, PNG, BMP, TIFF files. Single image or batch directory processing.
 
-**Stage 2 — Preprocessing:** CLAHE (Contrast Limited Adaptive Histogram Equalization) for local contrast enhancement, followed by non-local means denoising. This stage alone gives a +55% improvement in OCR word detection on clean scans, and larger gains on faded or poorly-lit images.
+**Stage 2 — Preprocessing:** CLAHE (Contrast Limited Adaptive Histogram Equalization) for local contrast enhancement, followed by non-local means denoising. Includes automatic image quality scoring (blur, brightness, contrast, resolution). This stage alone gives a +55% improvement in OCR word detection on clean scans, and larger gains on faded or poorly-lit images.
 
 **Stage 3 — OCR:** two engines run in parallel. Tesseract 5.5 (classical, fast, word-level detection) and PaddleOCR (deep learning, line-level detection). Both produce output in a common format: list of {text, confidence, bounding_box} dicts. Confidence is normalized to 0.0-1.0 for both engines.
 
 **Stage 4 — Layout Analysis:** groups OCR words into text lines by vertical position, then splits lines into four receipt regions (header, items, totals, footer) using keyword anchors with position-based fallback. Also pairs labels with their values on the same line (e.g., "TOTAL" on the left, "38.37" on the right).
 
-**Stage 5 — Field Extraction:** pulls structured fields from the layout regions using synonym lists (e.g., "total" / "grand total" / "amount payable" all map to total_amount), regex patterns for dates, word-boundary currency detection, and OCR-aware fallbacks (e.g., Tesseract often reads "RM" as "RH", so both are treated as Malaysian Ringgit).
+**Stage 5 — Field Extraction:** pulls structured fields from the layout regions using synonym lists (e.g., "total" / "grand total" / "amount payable" all map to total_amount), regex patterns for dates and invoice numbers, word-boundary currency detection, and OCR-aware fallbacks (e.g., Tesseract often reads "RM" as "RH", so both are treated as Malaysian Ringgit).
 
-**Stage 6 — JSON Output:** structured results with metadata, confidence notes, and cross-engine agreement flags.
+**Stage 6 — JSON Output:** structured results with metadata, confidence notes, image quality assessment, and cross-engine agreement flags.
 
 ## Setup Instructions
 
@@ -198,7 +208,7 @@ Each improvement was measured against ground truth before and after. No accuracy
     ├── generate_debug.py            # Generates visual debug images with bounding boxes
     ├── ground_truth.json            # Verified correct answers for 28 SROIE images
     ├── requirements.txt             # 54 pinned Python dependencies
-    ├── report.md                    # Detailed project report (2-3 pages)
+    ├── report.md                    # Detailed project report
     │
     ├── sample_images/               # 42 test images
     │   ├── sroie_01.jpg ... sroie_28.jpg      # SROIE dataset receipts
@@ -212,7 +222,7 @@ Each improvement was measured against ground truth before and after. No accuracy
     │
     ├── src/                         # Pipeline modules
     │   ├── __init__.py              # Package marker (empty)
-    │   ├── preprocessing.py         # Stage 2: CLAHE + denoising
+    │   ├── preprocessing.py         # Stage 2: CLAHE + denoising + quality scoring
     │   ├── ocr.py                   # Stage 3: Tesseract + PaddleOCR wrappers
     │   ├── layout.py                # Stage 4: line grouping + region detection
     │   ├── extraction.py            # Stage 5: field extraction + cross-engine
@@ -254,13 +264,19 @@ Each improvement was measured against ground truth before and after. No accuracy
 
 **Honest evaluation over inflated metrics.** The report documents what works, what doesn't, and why. Partial matches are reported separately from exact matches. Failures are analyzed by category.
 
+## Bonus Features Implemented
+
+**Bonus 2 — Image Quality Scoring:** every output includes an automatic quality assessment covering blur (Laplacian variance), brightness (mean pixel value), contrast (standard deviation), and resolution (total pixels). Each metric is rated and combined into an overall quality score (good/medium/poor).
+
+**Bonus 3 — Approach Comparison:** Tesseract (classical OCR) vs PaddleOCR (deep learning OCR) compared on the same images. Engine comparison table with specific wins/losses documented. Cross-engine agreement system built on top of the comparison.
+
 ## Known Limitations
 
 - **Deskew not implemented** — investigated (minAreaRect approach) but failed on receipt images where text fills the frame. Hough line transform alternative deferred due to time constraints. Tilted phone photos get degraded OCR results.
 - **Handwritten text** — neither Tesseract nor PaddleOCR handles handwriting. Both engines produce garbage on handwritten portions.
-- **Some date formats missing** — single-digit day/month (e.g., "6/2/2017"), month-as-text (e.g., "01-NOV-2017"), and YYYYMMDD (e.g., "20180428") are not covered.
 - **Vendor name accuracy** — limited by underlying OCR character errors and the simple heuristic of "first confident header line."
 - **No line-item extraction** — individual product lines are detected in the items region but not parsed into structured line items (description, quantity, unit price, amount).
+- **Invoice number coverage** — found on 17/42 images. Many receipts don't explicitly label their receipt/invoice number, or the label is too garbled for keyword matching.
 
 ## Technologies Used
 

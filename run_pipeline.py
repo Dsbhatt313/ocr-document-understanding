@@ -13,7 +13,7 @@ import cv2
 import sys
 from pathlib import Path
 
-from src.preprocessing import preprocess
+from src.preprocessing import preprocess, assess_image_quality
 from src.ocr import run_tesseract, run_paddleocr
 from src.layout import group_into_lines, identify_regions
 from src.extraction import extract_fields
@@ -26,6 +26,9 @@ def process_image(image_path, engine="tesseract"):
         return {"error": f"Could not load {image_path}"}
 
     image_height = image.shape[0]
+
+    # Image quality assessment
+    image_quality = assess_image_quality(image)
 
     # Stage 2: Preprocess
     preprocessed = preprocess(image)
@@ -56,6 +59,7 @@ def process_image(image_path, engine="tesseract"):
         fields = extract_fields(regions)
         fields["ocr_engine"] = engine
 
+    fields["image_quality"] = image_quality
     fields["source_file"] = Path(image_path).name
 
     return fields

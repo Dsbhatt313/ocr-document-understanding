@@ -173,6 +173,60 @@ def extract_fields(regions):
         if avg_conf > 0.5 and len(text) > 5:
             fields["vendor_name"] = text
             break
+    
+
+    # --- INVOICE / RECEIPT NUMBER ---
+    invoice_keywords = {"invoice no", "invoice number", "inv no", "inv#",
+                        "receipt no", "receipt number", "receipt#", "bill no",
+                        "bill number", "tax invoice no", "taxinv", "ref no",
+                        "reference no", "doc no", "document no"}
+    
+    for line in regions["header"] + regions["totals"] + regions.get("footer", []):
+        line_text = " ".join([w["text"] for w in line]).lower()
+        line_raw = " ".join([w["text"] for w in line])
+        
+        for keyword in invoice_keywords:
+            if keyword in line_text:
+                _, value = pair_label_value(line)
+                # Value must look like an invoice number: contains digits and length >= 3
+                if value and any(c.isdigit() for c in value) and len(value) >= 3:
+                    # Reject if value is purely a money amount (already captured as total)
+                    cleaned = value.replace(",", "").replace(".", "").replace("-", "")
+                    reject_words = {"invoice", "receipt", "bill", "tax", "invoice-", "oice"}
+                    if value.lower().strip() not in reject_words:
+                        if not cleaned.replace(" ", "").isdigit() or len(cleaned) > 4:
+                            fields["invoice_number"] = value
+                            break
+                
+                # Fallback: extract alphanumeric content after the keyword
+                idx = line_text.find(keyword)
+                after = line_raw[idx + len(keyword):].strip()
+                after = after.lstrip(":;.# ").strip()
+                if after and len(after) >= 3 and any(c.isdigit() for c in after):
+                    # Reject common false positives
+                    if after.upper().strip().rstrip("-") not in ("INVOICE", "RECEIPT", "BILL", "TAX", "OICE", ""):
+                        fields["invoice_number"] = after
+                        break
+        if "invoice_number" in fields:
+            break
+    
+    # Fallback: search for common invoice number patterns
+    if "invoice_number" not in fields:
+        all_text = ""
+        for region in regions.values():
+            for line in region:
+                all_text += " ".join([w["text"] for w in line]) + " "
+        
+        inv_patterns = [
+            r'(?:TaxInv|Taxinv|TAXINV)\s*[:#]?\s*\d{3,}',
+            r'(?:INV|RCP|RCPT|PIF|SURF)[-#]?\s*[A-Z0-9][-A-Z0-9]{3,}',
+        ]
+        for pattern in inv_patterns:
+            match = re.search(pattern, all_text)
+            if match:
+                fields["invoice_number"] = match.group().strip()
+                break
+
 
     # --- TOTAL AMOUNT ---
     total_synonyms = {"total", "grand total", "amount payable", "net amount",
@@ -300,6 +354,32 @@ def extract_fields(regions):
     
     fields["confidence_notes"] = confidence_notes
 
+    # --- CLEAN INVOICE NUMBER ---
+    if "invoice_number" in fields:
+        inv = fields["invoice_number"]
+        
+        # Remove leading dashes and spaces
+        inv = inv.lstrip("- ").strip()
+        
+        # Remove trailing date fragments: "CS00067741 Date14/03/2018" → "CS00067741"
+        inv = re.split(r'\s*[Dd]ate\s*', inv)[0].strip()
+        
+        # Remove "INVOICENO" prefix: "INVOICENO18385" → "18385"
+        inv_lower = inv.lower()
+        for prefix in ["invoiceno", "invoice no", "receiptno", "receipt no"]:
+            if inv_lower.startswith(prefix):
+                inv = inv[len(prefix):].lstrip(":;.# ").strip()
+                break
+        
+        # Final rejection: must contain a digit, must not be a common false positive
+        inv_upper = inv.upper().strip().rstrip("-")
+        reject = {"INVOICE", "RECEIPT", "BILL", "TAX", "TAX INVOICE",
+                  "OICE", "REFUNDABLE", ""}
+        if inv_upper in reject or not any(c.isdigit() for c in inv):
+            del fields["invoice_number"]
+        else:
+            fields["invoice_number"] = inv
+
     return fields
 
 def extract_fields_dual(regions_tess, regions_paddle):
@@ -328,7 +408,7 @@ def extract_fields_dual(regions_tess, regions_paddle):
     
     # Fields to compare
     compare_fields = ["vendor_name", "total_amount", "subtotal", "date",
-                      "payment_mode", "currency", "document_type"]
+                      "payment_mode", "currency", "document_type", "invoice_number"]
     
     for field in compare_fields:
         val_t = result_tess.get(field)

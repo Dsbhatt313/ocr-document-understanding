@@ -36,6 +36,8 @@ The dataset was designed to include variety across several dimensions: clean sca
 
 **Non-local means denoising:** removes sensor noise and compression artifacts from phone camera images while preserving text edges. Unlike simple blurring (which smears text), non-local means finds similar-looking patches across the image and averages them, so sharp text edges survive while random noise is smoothed away. Measured improvement: +7 additional confident words on top of CLAHE on a clean scan.
 
+**Image quality scoring (Bonus 2):** before extraction, the pipeline assesses each image's quality across four metrics: blur (Laplacian variance), brightness (mean pixel value), contrast (standard deviation), and resolution (total pixel count). Each metric is rated and combined into an overall quality assessment (good/medium/poor). This is included in every output JSON, letting users know upfront whether extraction results should be trusted.
+
 **Preprocessing order matters:** geometric corrections (deskew) should come before pixel-value corrections (CLAHE, denoise). We applied CLAHE first, then denoising, because deskew was not implemented (see below).
 
 ### What was investigated but not shipped
@@ -70,7 +72,9 @@ Each field is extracted using a combination of keyword matching, regex patterns,
 
 **subtotal:** same approach as total_amount with subtotal-specific synonyms ("subtotal", "sub total", "sub-total").
 
-**date:** regex search across all receipt regions (dates can appear in header, totals, or footer). Patterns tried in priority order: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, DD.MM.YYYY, DD/MM/YY, DD-MM-YY, DD.MM.YY. The DD-MM-YY pattern was added after evaluation showed most SROIE dates use this format — this single addition improved date accuracy from 25% to 67.9%.
+**invoice_number:** searches header, totals, and footer regions for lines matching invoice-related keywords ("invoice no", "receipt no", "bill no", "taxinv", "ref no", etc.). Uses label-value pairing to extract the alphanumeric portion. Falls back to regex patterns for common invoice number formats (e.g., "TaxInv:14072", "INV-1023", "PIF2600144"). Post-processing removes false positives (the word "INVOICE" itself, trailing date fragments like "Date14/03/2018"), strips prefix text ("INVOICENO18385" becomes "18385"), and validates that the result contains at least one digit. Found on 17/42 images.
+
+**date:** regex search across all receipt regions (dates can appear in header, totals, or footer). Patterns include both strict formats (DD/MM/YYYY, DD-MM-YYYY) and flexible formats (D/M/YYYY, D-M-YY) to handle single-digit days and months. Patterns are tried in priority order with longer formats first to avoid partial matches. The DD-MM-YY pattern was added after evaluation showed most SROIE dates use this format — this single addition improved date accuracy from 25% to 67.9%.
 
 **currency:** word-boundary matching against known indicators. "RM" or "MYR" in the text triggers Malaysian Ringgit. "INR" or standalone "Rs" triggers Indian Rupee. Includes an OCR-aware fallback: Tesseract often reads "RM" as "RH" (M and H look similar), so "RH" also triggers MYR detection. The word-boundary approach avoids false positives from substring matches (e.g., "rs" inside "returns" previously triggered false INR detection).
 
@@ -95,8 +99,9 @@ Each field in the output includes a quality assessment based on the OCR confiden
 | vendor_name found | 28/28 (100%) | 13/14 (93%) | 41/42 (98%) |
 | total_amount found | 22/28 (79%) | 5/14 (36%) | 27/42 (64%) |
 | date found | 24/28 (86%) | 6/14 (43%) | 30/42 (71%) |
+| invoice_number found | 10/28 (36%) | 7/14 (50%) | 17/42 (40%) |
 
-Personal images have lower detection rates because they include complex multi-section invoices (Automark Motors service invoice), varied layouts, and some images with significant tilt or poor lighting.
+Personal images have lower detection rates for totals and dates because they include complex multi-section invoices (Automark Motors service invoice), varied layouts, and some images with significant tilt or poor lighting. Personal images have higher invoice number detection because Indian tax invoices explicitly label invoice numbers.
 
 ### Accuracy against ground truth (28 SROIE images with verified labels)
 
@@ -118,26 +123,27 @@ Personal images have lower detection rates because they include complex multi-se
 
 Each improvement was measured against ground truth. No accuracy claims without evaluation data.
 
+**Note:** invoice_number is not included in the accuracy table because the SROIE ground truth does not contain invoice number labels. Detection rate (17/42) is reported but accuracy cannot be measured without ground truth.
+
 ## 7. Failure Cases
 
 ### Where the system worked well
 
-- **sroie_05.jpg (Guardian Health And Beauty):** vendor, total (38.37), date (19/05/18), currency (MYR), payment mode (CASH) all correctly extracted.
-- **sroie_26.jpg (Kedai Papan Yew Chuan):** vendor and date (11/05/2018) correct. Total extracted but slightly wrong (65.00 vs 68.90 — OCR read wrong digits).
+- **sroie_05.jpg (Guardian Health And Beauty):** vendor, total (38.37), date (19/05/18), invoice number (14072), currency (MYR), payment mode (CASH) all correctly extracted.
+- **sroie_26.jpg (Kedai Papan Yew Chuan):** vendor, date (11/05/2018), and invoice number (CS00012658) correct. Total extracted but slightly wrong (65.00 vs 68.90 — OCR read wrong digits).
 - **sroie_19.jpg (Grandma Homes Restaurant):** vendor and date (13/06/2018) correct from cross-engine mode where Tesseract alone missed the date.
-- **personal_01.jpg (Automark Motors):** vendor correctly identified, total (715.28) extracted, document correctly classified as tax_invoice.
+- **personal_01.jpg (Automark Motors):** vendor correctly identified, total (715.28) extracted, invoice number (PIF2600144) found, document correctly classified as tax_invoice.
 
 ### Where the system failed
 
-**Vendor name errors (17/28 wrong):**
+**Vendor name errors (13/28 wrong after fuzzy matching):**
 - OCR character errors: "Phd" instead of "Bhd", "Heauty" instead of "Beauty", "SANYO" instead of "SANYU"
 - PaddleOCR merging words: "MRD.I.VMSDNBHD" instead of "MR. D.I.Y. (M) SDN BHD"
 - Wrong line selected: "sscc= PLEASE VISIT US AGAIN" picked instead of the actual vendor name "CHECKERS HYPERMARKET" (the actual name wasn't in the header region due to receipt layout)
-- Character substitution side effect: "99 SPEED MART" became "99.5PEE0MART" because S was substituted to 5 (this substitution should only apply to numeric fields, not vendor names — this is a bug)
 
-**Date errors (5/28 wrong, 4/28 missing):**
+**Date errors (5/28 wrong, 3/28 missing):**
 - OCR digit errors: "25/05/2016" extracted when actual is "25/05/2018" (the "18" was misread as "16")
-- Missing: formats not covered by our regex patterns — single-digit day/month ("6/2/2017"), YYYYMMDD ("20180428"), month-as-text ("01-NOV-2017")
+- Missing: YYYYMMDD format ("20180428") and month-as-text ("01-NOV-2017") not covered by regex
 - One image had no date visible to either OCR engine
 
 **Total amount errors (9/28 wrong, 6/28 missing):**
@@ -156,6 +162,8 @@ Each improvement was measured against ground truth. No accuracy claims without e
 **Date format diversity:** the SROIE dataset uses multiple date formats within the same dataset (DD/MM/YYYY, DD-MM-YY, DD/MM/YY). Initially only DD/MM/YYYY was covered, catching 4/28 dates. Adding DD-MM-YY alone recovered 15 additional dates.
 
 **False positive patterns:** the YYYYMMDD regex pattern matched 8-digit product codes and registration numbers as dates. The \d{8} pattern was removed after evaluation showed more false positives than true matches.
+
+**Invoice number false positives:** initial invoice extraction returned "INVOICE" as the invoice number on 20+ images because lines containing "TAX INVOICE" matched the keyword "invoice" and the word itself was extracted as the value. Required multiple iterations of filtering: rejecting results without digits, rejecting common words ("INVOICE", "RECEIPT", "BILL"), and cleaning up prefix/suffix artifacts.
 
 ## 9. What I Would Improve With More Time
 

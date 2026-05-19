@@ -20,6 +20,7 @@ Thumbs.db
 # Outputs that shouldn't bloat the repo
 # (we'll commit a few sample outputs, but not all)
 outputs/*.json
+!outputs/all_results_both.json
 !outputs/.gitkeep
 
 # Large model files if any get downloaded locally

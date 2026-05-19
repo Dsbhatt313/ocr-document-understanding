@@ -64,7 +64,7 @@ The system follows a 6-stage pipeline:
 - **Python 3.11** (3.12+ may have compatibility issues with PaddlePaddle)
 - **Tesseract OCR 5.5+** must be installed separately and available on PATH
 - **16GB RAM** recommended (PaddleOCR loads ~50MB of model weights into memory)
-- **Windows / Linux / macOS** — tested on Windows 10 with Intel i7 + GTX 1650 Ti
+- **Windows** — tested on Windows 10 with Intel i7 + GTX 1650 Ti
 
 ### Step 1: Install Tesseract OCR
 
@@ -72,14 +72,6 @@ Tesseract is a system-level dependency, not a Python package.
 
 **Windows:** download the installer from https://github.com/UB-Mannheim/tesseract/wiki and run it. Default install path is C:\Program Files\Tesseract-OCR\. Make sure "Add to PATH" is checked during installation, or add it manually.
 
-**Linux (Ubuntu/Debian):**
-
-    sudo apt update
-    sudo apt install tesseract-ocr
-
-**macOS:**
-
-    brew install tesseract
 
 Verify installation:
 
@@ -100,12 +92,6 @@ Activate it:
 
     # Windows (PowerShell)
     .venv\Scripts\activate
-
-    # Windows (CMD)
-    .venv\Scripts\activate.bat
-
-    # Linux / macOS
-    source .venv/bin/activate
 
 You should see (.venv) in your terminal prompt.
 
